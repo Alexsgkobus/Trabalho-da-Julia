@@ -7,6 +7,9 @@ Outras:
 https://www.kaggle.com/datasets/heesoo37/120-years-of-olympic-history-athletes-and-result
 https://www.kaggle.com/datasets/piterfm/paris-2024-olympic-summer-games
 
+Relacionados:
+https://www.olympedia.org/statistics/age
+
 
 
 
