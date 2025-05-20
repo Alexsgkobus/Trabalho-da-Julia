@@ -84,6 +84,7 @@ games_final <- games_final %>%
 
 # Mudando o ano (year) de 2020 para 2021 nas Olimpíadas de Tokyo
 games_final$year[games_final$edition == "2020 Summer Olympics"] <- 2021
+print(games_final$edition)
 
 # Contando quantas edições a base fornece
 n_distinct(games_final$edition_id) # 55 id's distintos de edições 
@@ -107,7 +108,7 @@ bio_event_games <- bio_final %>%
 
 # Tirando colunas duplicadas 
 bio_event_games <- bio_event_games %>%
-  select(-edition.x, -edition.y, -athlete, -country_noc.x, - country_noc.y)
+  select(-edition.x, -athlete, -country_noc.x, - country_noc.y)
 
 # Com quantos atletas fiquei nessa base? 155867
 n_distinct(bio_event_games$athlete_id)
@@ -115,13 +116,13 @@ n_distinct(bio_event_games$athlete_id)
 # Filtrando para criar uma base final com os 151694 atletas de bio_final
 bio_event_games_f <- bio_event_games %>%
   filter(athlete_id %in% bio_final$athlete_id)
+print(bio_event_games_f$edition.y) # edition agora é edition.y
 
 n_distinct(bio_event_games_f$athlete_id)  #151694 atletas!
 
 #------------------------------------------------------------------------------#
 
 # Idade dos atletas na olimpíada em que participaram
-
 
 # Identifica quem tem data de nascimento completa no formato "4 April 1949"
 has_full_born_date <- grepl("^[0-9]{1,2} [A-Za-z]+ [0-9]{4}$", born_raw) 
@@ -158,8 +159,47 @@ converted_full_start_date <- as.Date(parse_date_time(bio_event_games_f$full_star
 length(unique(converted_full_start_date)) # 55 datas de início convertidas, bate
                                           # com a linha 89
 print(converted_full_start_date)
-# VOLTAR PARA IDADE DEPOIS!!
 
+# Calcula idade em anos completos para quem tem data completa
+bio_event_games_f$age[has_full_born_date] <- 
+  floor(as.numeric(difftime(
+    converted_full_start_date[has_full_born_date], 
+    converted_born, 
+    units = "days")) / 365.25)
+
+sum(is.na(bio_event_games_f$age))  # 4031 NA restantes, bate com a quantidade de
+                                   # datas de nascimento incompletas - linha 135
+
+
+# Identifica quem tem data de nascimento incompleta
+# Quem NÃO tem data de nascimento completa
+incomplete_born <- !has_full_born_date
+
+# Subconjunto das datas incompletas
+born_incomplete_raw <- bio_event_games_f$born[incomplete_born]
+
+# Extrai todos os anos 
+all_years_found <- str_extract_all(born_incomplete_raw, "[0-9]{4}")
+
+# Pega o menor ano encontrado em cada string (ou NA se nenhum)
+extract_min_year <- function(years) {
+  if (length(years) == 0) return(NA_integer_)
+  return(min(as.numeric(years), na.rm = TRUE))
+}
+born_year <- sapply(all_years_found, extract_min_year)
+
+# Extrai ano da Olimpíada correspondente
+olympic_year <- as.numeric(format(converted_full_start_date[incomplete_born], "%Y"))
+
+# Calcula a idade aproximada
+ages_incomplete <- olympic_year - born_year
+
+# Atribui de volta à base
+bio_event_games_f$age[incomplete_born] <- ages_incomplete
+
+sum(is.na(bio_event_games_f$age)) # 0 NA -> todas as idades foram calculadas
+
+#------------------------------------------------------------------------------#
 
 # Verificação de ID's 
 bio_event_games_f %>%
@@ -169,8 +209,8 @@ bio_event_games_f %>%
 nrow(atletas_com_multiplos_nomes) # 0 atletas têm mais de 1 nome associado 
                                   # ao mesmo id
 
-# 5 atletas tem mesmo nome, data de nascimento e país de origem iguais, mas em 
-# algum momento id's diferentes
+# 10 atletas (2 a 2) tem mesmo nome, data de nascimento e país de origem, mas em 
+# algum momento id's diferentes:
 bio_event_games_f %>%
   group_by(name, born, country) %>%
   summarize(
@@ -185,15 +225,14 @@ bio_event_games_f %>%
   arrange(name, born, country) %>%
   View()
 
-# Identifica os 5 atletas (nome, born, country) com múltiplos IDs
+# Identifica os 10 atletas (nome, born, country) com múltiplos IDs
 atletas_mult_ids <- bio_event_games_f %>%
   group_by(name, born, country) %>%
   summarize(
     ids_distintos = n_distinct(athlete_id),
     .groups = "drop"
   ) %>%
-  filter(ids_distintos > 1) %>%
-  slice_head(n = 5)  # pegar os 5 primeiros
+  filter(ids_distintos > 1)
 
 # Filtra essas combinações e detalha por ID
 bio_event_games_f %>%
@@ -203,67 +242,77 @@ bio_event_games_f %>%
     esporte = paste(sort(unique(sport)), collapse = "; "),
     evento = paste(sort(unique(event)), collapse = "; "),
     ano_olímpico = paste(sort(unique(year)), collapse = "; "),
+    posição = paste(sort(unique(pos)), collapse = "; "),
     .groups = "drop"
   ) %>%
   arrange(name, born, country, athlete_id) %>%
   View()
-# Verificar se são a mesma pessoa!!!!!
+# Pesquisando na internet, dos 10 atletas, 4 não consegui identificar se são a 
+# mesma pessoa ou não, então vou mantê-los
 
-sum(is.na(bio_event_games_f$age)) #9946 NA em age
-sum(!is.na(bio_event_games$age)) #304420 valores de idade em age
-#revisar age -> verificar id dos atletas que participaram em mais de uma olimpíada, se for diferente,
-#filtra por id pra nao repetir a idade por evento. Se for igual, filtra por id por 
-#edição pra nao repetir a idade por evento.
+# Testando se um mesmo atleta que competiu em mais de uma olimpíada tem o mesmo
+# id nas diferentes edições
+
+# Filtra registros com nome "Michael Jordan"
+jordan_data <- bio_event_games_f[bio_event_games_f$name == "Michael Jordan", ]
+# Exibe os anos e os ids encontrados
+unique(jordan_data[, c("year", "athlete_id")])
+
+#        year athlete_id
+# 156416 1984       6342
+# 156417 1992       6342 -> mesmo id
 
 #------------------------------------------------------------------------------#
 
 # Resultados
-# arrumar o nome da edição para os gráficos...
 
+# Sumário da idade:
+summary(bio_event_games_f$age)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 10.00   21.00   25.00   25.62   28.00   97.00 
 
-# Média, mínimo e máximo de idade geral: 25.5936, 10, 98
-mean(bio_event_games$age, na.rm = TRUE) 
-min(bio_event_games$age, na.rm = TRUE)
-max(bio_event_games$age, na.rm = TRUE)
-
+max(bio_event_games_f$age)
+bio_event_games_f %>% 
+  filter(age == 97) %>%
+  select(athlete_id, name, age, year, sport)  # seleciona colunas que podem te interessar
 
 # Média, mínimo e máximo de idade por olimpíada
-per_edition <- 
-bio_event_games %>%
+age_per_edition <- 
+bio_event_games_f %>%
   group_by(edition.y) %>%
   summarise(
-    media_idade = if (all(is.na(age))) NA else mean(age, na.rm = TRUE),
-    idade_minima = if (all(is.na(age))) NA else min(age, na.rm = TRUE),
-    idade_maxima = if (all(is.na(age))) NA else max(age, na.rm = TRUE),
+    media_idade = mean(age, na.rm = TRUE),
+    idade_minima = min(age, na.rm = TRUE),
+    idade_maxima = max(age, na.rm = TRUE),
     n = sum(!is.na(age))
   ) %>%
   arrange(edition.y)
-print(per_edition, n = Inf)
+print(age_per_edition, n = Inf)
 
-# A tibble: 64 × 5
-#edition.y                 media_idade  idade_minima idade_maxima n
-#<chr>                         <dbl>        <int>        <int> <int>
-#1 1896 Summer Olympics        23.5           10           40   363
-#2 1900 Summer Olympics        NA             NA           NA     0
-#3 1904 Summer Olympics        25.0           12           71  2344
-#4 1906 Intercalated           NA             NA           NA     0
-#5 1908 Summer Olympics        26.7           15           62  3508
-#6 1912 Summer Olympics        26.9           13           67  5195
-#7 1916 Summer Olympics        NA             NA           NA     0
-#8 1920 Summer Olympics        29.4           13           72  4077
-#9 1924 Summer Olympics        28.2           13           75  5564
-#10 1924 Winter Olympics       28.6           11           64   554
+# A tibble: 55 × 5
+# edition.y                 media_idade idade_minima idade_maxima   n
+#  <chr>                         <dbl>        <dbl>        <dbl> <int>
+#  1 1896 Summer Olympics        23.6           10           41   449
+#  2 1900 Summer Olympics        28.4           13           71  2582
+#  3 1904 Summer Olympics        25.1           12           71  2449
+#  4 1906 Intercalated           24             24           24     7
+#  5 1908 Summer Olympics        26.6           14           62  3680
+#  6 1912 Summer Olympics        26.7           13           67  5344
+#  7 1920 Summer Olympics        29.2           13           72  4296
+#  8 1924 Summer Olympics        28.1           13           75  6188
+#  9 1924 Winter Olympics        28.4           11           64   582
+#  10 1928 Summer Olympics       28.2           11           97  5418
 
 
 # Gráfico de linha Média de Idade por Edição dos Jogos Olímpicos
-age_per_edition <- bio_event_games %>%
-  group_by(edition.y) %>%
+age_per_edition_mean <- bio_event_games_f %>%
+  group_by(year) %>%
   summarise(
     media_idade = mean(age, na.rm = TRUE),
     .groups = "drop"
   )
 
-ggplot(age_per_edition, aes(x = edition.y, y = media_idade, group = 1)) +
+ggplot(age_per_edition_mean, aes(x = year, y = media_idade, group = 1)) +
   geom_line(color = "violet", size = 1) +
   geom_point(color = "darkviolet", size = 2) +
   labs(
@@ -271,53 +320,134 @@ ggplot(age_per_edition, aes(x = edition.y, y = media_idade, group = 1)) +
     x = "Edição",
     y = "Média de Idade"
   ) +
+  scale_x_continuous(breaks = seq(min(age_per_edition_mean$year), max(age_per_edition_mean$year), by = 4)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
-# Boxplot "Distribuição da Idade por Edição dos Jogos Olímpicos"
-ggplot(bio_event_games, aes(x = edition.y, y = age)) +
-  geom_boxplot(fill = "violet", color = "darkviolet") +
+# Gráfico de linha Média de Idade por Edição dos Jogos Olímpicos de Verão
+age_per_edition_mean_s <- bio_event_games_f %>%
+  filter(str_detect(edition.y, "Summer")) %>%
+  group_by(year) %>%
+  summarise(
+    media_idade = mean(age, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(age_per_edition_mean_s, aes(x = year, y = media_idade, group = 1)) +
+  geom_line(color = "orange", size = 1) +
+  geom_point(color = "goldenrod", size = 2) +
   labs(
-    title = "Distribuição da Idade por Edição dos Jogos Olímpicos",
+    title = "Média de Idade por Edição dos Jogos Olímpicos de Verão",
     x = "Edição",
+    y = "Média de Idade"
+  ) +
+  scale_x_continuous(breaks = age_per_edition_mean_s$year) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+# Gráfico de linha Média de Idade por Edição dos Jogos Olímpicos de Inverno
+age_per_edition_mean_w <- bio_event_games_f %>%
+  filter(str_detect(edition.y, "Winter")) %>%
+  group_by(year) %>%
+  summarise(
+    media_idade = mean(age, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(age_per_edition_mean_w, aes(x = year, y = media_idade, group = 1)) +
+  geom_line(color = "coral", size = 1) +
+  geom_point(color = "darkred", size = 2) +
+  labs(
+    title = "Média de Idade por Edição dos Jogos Olímpicos de Inverno",
+    x = "Edição",
+    y = "Média de Idade"
+  ) +
+  scale_x_continuous(breaks = age_per_edition_mean_w$year) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+# Gráfico de linha Mediana de Idade por Edição dos Jogos Olímpicos
+age_per_edition_median <- bio_event_games_f %>%
+  group_by(year) %>%
+  summarise(
+    mediana_idade = median(age, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(age_per_edition_median, aes(x = year, y = mediana_idade, group = 1)) +
+  geom_line(color = "green", size = 1) +
+  geom_point(color = "darkgreen", size = 2) +
+  labs(
+    title = "Mediana de Idade por Edição dos Jogos Olímpicos",
+    x = "Edição",
+    y = "Média de Idade"
+  ) +
+  scale_x_continuous(breaks = seq(min(age_per_edition_median$year), max(age_per_edition_median$year), by = 4)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+# Boxplot "Distribuição da Idade por Edição dos Jogos Olímpicos de Verão"
+bio_event_games_f %>%
+  filter(str_detect(edition.y, "Summer")) %>%
+  ggplot(aes(x = as.factor(year), y = age)) +
+  geom_boxplot(fill = "orchid", color = "purple") +
+  labs(
+    title = "Distribuição da Idade nos Jogos Olímpicos de Verão",
+    x = "Ano",
     y = "Idade"
   ) +
   theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+# Boxplot "Distribuição da Idade por Edição dos Jogos Olímpicos de Inverno"
+bio_event_games_f %>%
+  filter(str_detect(edition.y, "Winter")) %>%
+  ggplot(aes(x = as.factor(year), y = age)) +
+  geom_boxplot(fill = "yellow", color = "gold") +
+  labs(
+    title = "Distribuição da Idade nos Jogos Olímpicos de Inverno",
+    x = "Ano",
+    y = "Idade"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
 # Média, mínimo e máximo de idade por esporte
 per_sport <- 
-  bio_event_games %>%
+  bio_event_games_f %>%
   group_by(sport) %>%
   summarise(
-    media_idade = if (all(is.na(age))) NA else mean(age, na.rm = TRUE),
-    idade_minima = if (all(is.na(age))) NA else min(age, na.rm = TRUE),
-    idade_maxima = if (all(is.na(age))) NA else max(age, na.rm = TRUE),
+    media_idade = mean(age, na.rm = TRUE),
+    idade_minima = min(age, na.rm = TRUE),
+    idade_maxima = max(age, na.rm = TRUE),
     n = sum(!is.na(age))
   ) %>%
   arrange(sport)
 print(per_sport, n = Inf)
 
-# A tibble: 113 × 5
-#sport                         media_idade idade_minima idade_maxima n
-#<chr>                           <dbl>        <int>        <int> <int>
-#1 3x3 Basketball                   28.3           19           41    64
-#2 Aeronautics                      26             26           26     1
-#3 Alpine Skiing                    23.5           14           55 10369
-#4 Alpinism                         38.8           22           57    56
-#5 American Football                21.8           16           30   160
-#6 Archery                          27.8           14           71  2511
-#7 Art Competitions                 45.7           14           98  3333
-#8 Artistic Gymnastics              22.8           10           49 26908
-#9 Artistic Swimming                22.5           15           40  1036
-#10 Athletics                        25.1           12           55 45562
+# A tibble: 107 × 5
+# sport                         media_idade idade_minima idade_maxima    n
+#  <chr>                              <dbl>        <dbl>        <dbl> <int>
+#  1 3x3 Basketball                   28.3           19           41    64
+#  2 Aeronautics                      26             26           26     1
+#  3 Alpine Skiing                    23.5           14           55 10441
+#  4 Alpinism                         38.8           22           57    56
+#  5 American Football                21.9           16           31   166
+#  6 Archery                          28.0           14           71  2555
+#  7 Art Competitions                 45.5           14           97  3471
+#  8 Artistic Gymnastics              22.8           10           49 27271
+#  9 Artistic Swimming                22.5           15           40  1036
+#  10 Athletics                       25.1           12           70 46898
+
 
 # Gráfico de barras Média de Idade por Esporte
-age_per_sport <- bio_event_games %>%
+age_per_sport <- bio_event_games_f %>%
   group_by(sport) %>%
   summarise(
     media_idade_esporte = mean(age, na.rm = TRUE),
@@ -325,18 +455,21 @@ age_per_sport <- bio_event_games %>%
   )
 
 ggplot(age_per_sport, aes(x = sport, y = media_idade_esporte, group = 1)) +
-  geom_col(fill = "salmon") +
+  geom_line(color = "chocolate", size = 1) +
+  geom_point(color = "brown", size = 2) +
   labs(
     title = "Média de Idade por Esporte",
     x = "Esporte",
     y = "Média de Idade"
   ) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 
 # Boxplot "Distribuição da Idade por Esporte"
-ggplot(bio_event_games, aes(x = sport, y = age)) +
-  geom_boxplot(fill = "lightpink", color = "salmon") +
+ggplot(bio_event_games_f, aes(x = sport, y = age)) +
+  geom_boxplot(fill = "hotpink", color = "magenta") +
   labs(
     title = "Distribuição da Idade por Esporte",
     x = "Espote",
@@ -346,6 +479,33 @@ ggplot(bio_event_games, aes(x = sport, y = age)) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
+
+# Média, mínimo e máximo de idade por sexo 
+  bio_event_games_f %>%
+  group_by(sex) %>%
+  summarise(
+    media_idade = mean(age, na.rm = TRUE),
+    idade_minima = min(age, na.rm = TRUE),
+    idade_maxima = max(age, na.rm = TRUE),
+    n = sum(!is.na(age))
+  ) %>%
+  arrange(sex)
+print(per_sex, n = Inf)
+
+# A tibble: 2 × 5
+# sex    media_idade idade_minima idade_maxima      n
+# <chr>        <dbl>        <dbl>        <dbl>  <int>
+# 1 Female        24.0           11           74  89161
+# 2 Male          26.3           10           97 221758
+
+
+
+
+
+# parei aqui ----------------------------------------!!!!!!!!1!!!!!!!3 #
+
+
+
 
 
 # Média, mínimo e máximo de idade por sexo
@@ -469,3 +629,5 @@ ggplot(minors_per_country, aes(x = country_noc, y = menores_idade_pais, group = 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # Menores de idade e medalhas/classificações
+# Separar inverno e verão
+# esportes com os menores minimos de idade
