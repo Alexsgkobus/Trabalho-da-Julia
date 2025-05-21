@@ -481,7 +481,7 @@ ggplot(bio_event_games_f, aes(x = sport, y = age)) +
   )
 
 # Média, mínimo e máximo de idade por sexo 
-  bio_event_games_f %>%
+bio_event_games_f %>%
   group_by(sex) %>%
   summarise(
     media_idade = mean(age, na.rm = TRUE),
@@ -490,7 +490,6 @@ ggplot(bio_event_games_f, aes(x = sport, y = age)) +
     n = sum(!is.na(age))
   ) %>%
   arrange(sex)
-print(per_sex, n = Inf)
 
 # A tibble: 2 × 5
 # sex    media_idade idade_minima idade_maxima      n
@@ -499,36 +498,8 @@ print(per_sex, n = Inf)
 # 2 Male          26.3           10           97 221758
 
 
-
-
-
-# parei aqui ----------------------------------------!!!!!!!!1!!!!!!!3 #
-
-
-
-
-
-# Média, mínimo e máximo de idade por sexo
-per_sex <- 
-  bio_event_games %>%
-  group_by(sex) %>%
-  summarise(
-    media_idade = if (all(is.na(age))) NA else mean(age, na.rm = TRUE),
-    idade_minima = if (all(is.na(age))) NA else min(age, na.rm = TRUE),
-    idade_maxima = if (all(is.na(age))) NA else max(age, na.rm = TRUE),
-    n = sum(!is.na(age))
-  ) %>%
-  arrange(sex)
-print(per_sex, n = Inf)
-
-# A tibble: 3 × 5
-#sex       media_idade idade_minima idade_maxima   n
-#<chr>           <dbl>        <int>        <int> <int>
-#1 Female        24.0           11           74  88958
-#2 Male          26.3           10           98 215462
-
 # Gráfico de barras Média de Idade por Sexo
-age_per_sex <- bio_event_games %>%
+age_per_sex <- bio_event_games_f %>%
   group_by(sex) %>%
   summarise(
     media_idade_sexo = mean(age, na.rm = TRUE),
@@ -546,7 +517,7 @@ ggplot(age_per_sex, aes(x = sex, y = media_idade_sexo, group = 1)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) # tirar essa barra NA
 
 # Boxplot "Distribuição da Idade por Sexo"
-ggplot(bio_event_games, aes(x = sex, y = age)) +
+ggplot(bio_event_games_f, aes(x = sex, y = age)) +
   geom_boxplot(fill = "steelblue", color = "lightblue") +
   labs(
     title = "Distribuição da Idade por Sexo",
@@ -560,58 +531,92 @@ ggplot(bio_event_games, aes(x = sex, y = age)) +
 
 
 # Número de menores por Olimpíada
-minors_per_edition <- bio_event_games %>%
-  filter(!is.na(age), age < 18) %>%
+minors_per_edition <- bio_event_games_f %>%
+  filter(age < 18) %>%
   group_by(edition.y) %>%
   summarise(qtd_menores = n()) %>%
   arrange(desc(qtd_menores))  
-print(minors_per_edition) #Máximo: 1039
+print(minors_per_edition) 
 
-# Proporção de menores por Olimpíada
-minors_per_edition_proportion <- bio_event_games %>%
-  filter(!is.na(age)) %>%
+# edition.y              qtd_menores
+# <chr>                        <int>
+# 1 1972 Summer Olympics        1039
+# 2 1976 Summer Olympics         940
+# 3 1996 Summer Olympics         920
+# 4 1988 Summer Olympics         916
+# 5 1992 Summer Olympics         887
+# 6 1968 Summer Olympics         853
+# 7 1984 Summer Olympics         740
+# 8 2000 Summer Olympics         688
+# 9 1980 Summer Olympics         675
+#10 2004 Summer Olympics         591
+
+
+# Proporção de menores por Olimpíada em ordem decrescente
+minors_per_edition_proportion <- bio_event_games_f %>%
   group_by(edition.y) %>%
   summarise(
     total = n(),
-    menores = sum(age < 18),
-    proporcao_menores = menores / total
+    menores = sum(age < 18, na.rm = TRUE),
+    proporcao_menores = menores / total,
+    .groups = "drop"
   ) %>%
-  arrange(desc(proporcao_menores))  
-print(minors_per_edition_proportion) 
+  arrange(desc(proporcao_menores))
+print(minors_per_edition_proportion)
 
-ggplot(minors_per_edition_proportion, aes(x = edition.y, y = proporcao_menores)) +
+# edition.y              total menores proporcao_menores
+# 1 1976 Summer Olympics  8966     940            0.105 
+# 2 1972 Summer Olympics 10856    1039            0.0957
+# 3 1980 Summer Olympics  7361     675            0.0917
+# 4 1968 Summer Olympics  9325     853            0.0915
+# 5 1984 Summer Olympics  9985     740            0.0741
+# 6 1988 Summer Olympics 12746     916            0.0719
+# 7 1992 Summer Olympics 13490     887            0.0658
+# 8 1996 Summer Olympics 14013     920            0.0657
+# 9 1976 Winter Olympics  1878     118            0.0628
+#10 1988 Winter Olympics  3105     162            0.0522
+
+minors_per_edition_proportion <- minors_per_edition_proportion %>%
+  mutate(year = as.numeric(str_extract(edition.y, "\\d{4}")))
+library(scales)
+# Gráfico apenas com as edições de verão
+minors_per_edition_proportion %>%
+  filter(str_detect(edition.y, "Summer")) %>%
+  ggplot(aes(x = year, y = proporcao_menores)) +
   geom_col(fill = "steelblue") +
   labs(
-    title = "Proporção de menores de idade por edição olímpica",
-    x = "Edição dos Jogos Olímpicos",
+    title = "Proporção de menores de idade por edição olímpica de verão",
+    x = "Ano",
     y = "Proporção de menores"
   ) +
+  scale_x_continuous(breaks = unique(minors_per_edition_proportion$year)) + 
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1))
+  scale_y_continuous(labels = percent_format(accuracy = 1)) # revisar!!!! 
 
 # Número de menores por País
-minors_per_country <- bio_event_games %>%
+minors_per_country <- bio_event_games_f %>%
   filter(!is.na(age), age < 18) %>%
   group_by(country_noc) %>%
   summarise(qtd_menores = n()) %>%
   arrange(desc(qtd_menores))  
 print(minors_per_country) 
 
-# country_noc  qtd_menores
-#<chr>               <int>
-#1 USA                2111
-#2 CAN                1194
-#3 FRG                1039
-#4 KOR                1020
-#5 ESP                 887
-#6 MEX                 853
-#7 AUS                 845
-#8 JPN                 828
-#9 URS                 674
-#10 CHN                614
+# A tibble: 25 × 2
+#   country_noc qtd_menores
+#   <chr>             <int>
+# 1 USA                2087
+# 2 CAN                1199
+# 3 FRG                1039
+# 4 KOR                1033
+# 5 ESP                 887
+# 6 AUS                 858
+# 7 MEX                 853
+# 8 JPN                 834
+# 9 URS                 675
+#10 CHN                 615
 
 # Número de menores por País - Gráfico
-minors_per_country <- bio_event_games %>%
+minors_per_country <- bio_event_games_f %>%
   group_by(country_noc) %>%
   summarise(
     menores_idade_pais = sum(age, na.rm = TRUE),
@@ -629,5 +634,4 @@ ggplot(minors_per_country, aes(x = country_noc, y = menores_idade_pais, group = 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # Menores de idade e medalhas/classificações
-# Separar inverno e verão
 # esportes com os menores minimos de idade
