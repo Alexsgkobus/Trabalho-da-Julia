@@ -9,6 +9,8 @@ library(ggplot2)
 library(plotly)
 library(lubridate)
 library(stringr)
+library(tidyr)
+library(scales)
 
 #------------------------------------------------------------------------------#
 
@@ -124,6 +126,11 @@ n_distinct(bio_event_games_f$athlete_id)  #151694 atletas!
 
 # Idade dos atletas na olimpíada em que participaram
 
+
+# Born externo à base para cálculo da idade
+born_raw <- bio_event_games_f$born
+sum(is.na(born_raw)) # 0 NA
+
 # Identifica quem tem data de nascimento completa no formato "4 April 1949"
 has_full_born_date <- grepl("^[0-9]{1,2} [A-Za-z]+ [0-9]{4}$", born_raw) 
 length(has_full_born_date) # 310919 datas de nascimento totais (completas e in-
@@ -136,11 +143,6 @@ sum(!(grepl("^[0-9]{1,2} [A-Za-z]+ [0-9]{4}$", born_raw)),
     na.rm = TRUE) + sum(is.na(born_raw)) # 4031 datas incompletas ou NA
 sum(is.na(bio_event_games_f$born)) # 0 NA  
 # Então há 4031 datas incompletas (somente ano(s))
-
-
-# Born externo à base para cálculo da idade
-born_raw <- bio_event_games_f$born
-sum(is.na(born_raw)) # 0 NA
 
 # Inicializa a coluna idade
 bio_event_games_f$age <- NA
@@ -266,15 +268,13 @@ unique(jordan_data[, c("year", "athlete_id")])
 
 # Resultados
 
+# Cores: lighblue/blue edições de inverno, pink/darkred edições de verão, 
+#        lightgreen/green geral.
+
 # Sumário da idade:
 summary(bio_event_games_f$age)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 10.00   21.00   25.00   25.62   28.00   97.00 
-
-max(bio_event_games_f$age)
-bio_event_games_f %>% 
-  filter(age == 97) %>%
-  select(athlete_id, name, age, year, sport)  # seleciona colunas que podem te interessar
 
 # Média, mínimo e máximo de idade por olimpíada
 age_per_edition <- 
@@ -304,7 +304,7 @@ print(age_per_edition, n = Inf)
 #  10 1928 Summer Olympics       28.2           11           97  5418
 
 
-# Gráfico de linha Média de Idade por Edição dos Jogos Olímpicos
+# Gráfico de linha Média de Idade nos Jogos Olímpicos (de 4 em 4 anos)
 age_per_edition_mean <- bio_event_games_f %>%
   group_by(year) %>%
   summarise(
@@ -313,10 +313,10 @@ age_per_edition_mean <- bio_event_games_f %>%
   )
 
 ggplot(age_per_edition_mean, aes(x = year, y = media_idade, group = 1)) +
-  geom_line(color = "violet", size = 1) +
-  geom_point(color = "darkviolet", size = 2) +
+  geom_line(color = "lightgreen", linewidth = 1) +
+  geom_point(color = "darkgreen", size = 2) +
   labs(
-    title = "Média de Idade por Edição dos Jogos Olímpicos",
+    title = "Média de Idade nos Jogos Olímpicos",
     x = "Edição",
     y = "Média de Idade"
   ) +
@@ -335,8 +335,8 @@ age_per_edition_mean_s <- bio_event_games_f %>%
   )
 
 ggplot(age_per_edition_mean_s, aes(x = year, y = media_idade, group = 1)) +
-  geom_line(color = "orange", size = 1) +
-  geom_point(color = "goldenrod", size = 2) +
+  geom_line(color = "pink", linewidth = 1) +
+  geom_point(color = "darkred", size = 2) +
   labs(
     title = "Média de Idade por Edição dos Jogos Olímpicos de Verão",
     x = "Edição",
@@ -347,7 +347,7 @@ ggplot(age_per_edition_mean_s, aes(x = year, y = media_idade, group = 1)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
-# Gráfico de linha Média de Idade por Edição dos Jogos Olímpicos de Inverno
+# Gráfico de linha - Média de Idade por Edição dos Jogos Olímpicos de Inverno
 age_per_edition_mean_w <- bio_event_games_f %>%
   filter(str_detect(edition.y, "Winter")) %>%
   group_by(year) %>%
@@ -357,8 +357,8 @@ age_per_edition_mean_w <- bio_event_games_f %>%
   )
 
 ggplot(age_per_edition_mean_w, aes(x = year, y = media_idade, group = 1)) +
-  geom_line(color = "coral", size = 1) +
-  geom_point(color = "darkred", size = 2) +
+  geom_line(color = "lightblue", linewidth = 1) +
+  geom_point(color = "darkblue", size = 2) +
   labs(
     title = "Média de Idade por Edição dos Jogos Olímpicos de Inverno",
     x = "Edição",
@@ -369,7 +369,7 @@ ggplot(age_per_edition_mean_w, aes(x = year, y = media_idade, group = 1)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
-# Gráfico de linha Mediana de Idade por Edição dos Jogos Olímpicos
+# Gráfico de linha Mediana de Idade dos Jogos Olímpicos
 age_per_edition_median <- bio_event_games_f %>%
   group_by(year) %>%
   summarise(
@@ -378,10 +378,10 @@ age_per_edition_median <- bio_event_games_f %>%
   )
 
 ggplot(age_per_edition_median, aes(x = year, y = mediana_idade, group = 1)) +
-  geom_line(color = "green", size = 1) +
+  geom_line(color = "lightgreen", size = 1) +
   geom_point(color = "darkgreen", size = 2) +
   labs(
-    title = "Mediana de Idade por Edição dos Jogos Olímpicos",
+    title = "Mediana de Idade nos Jogos Olímpicos",
     x = "Edição",
     y = "Média de Idade"
   ) +
@@ -394,7 +394,7 @@ ggplot(age_per_edition_median, aes(x = year, y = mediana_idade, group = 1)) +
 bio_event_games_f %>%
   filter(str_detect(edition.y, "Summer")) %>%
   ggplot(aes(x = as.factor(year), y = age)) +
-  geom_boxplot(fill = "orchid", color = "purple") +
+  geom_boxplot(fill = "pink", color = "darkred") +
   labs(
     title = "Distribuição da Idade nos Jogos Olímpicos de Verão",
     x = "Ano",
@@ -408,7 +408,7 @@ bio_event_games_f %>%
 bio_event_games_f %>%
   filter(str_detect(edition.y, "Winter")) %>%
   ggplot(aes(x = as.factor(year), y = age)) +
-  geom_boxplot(fill = "yellow", color = "gold") +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
   labs(
     title = "Distribuição da Idade nos Jogos Olímpicos de Inverno",
     x = "Ano",
@@ -446,17 +446,18 @@ print(per_sport, n = Inf)
 #  10 Athletics                       25.1           12           70 46898
 
 
-# Gráfico de barras Média de Idade por Esporte
+# Gráfico de barras Média e Mínimo de Idade por Esporte
 age_per_sport <- bio_event_games_f %>%
   group_by(sport) %>%
   summarise(
     media_idade_esporte = mean(age, na.rm = TRUE),
+    minimo_idade_esporte = min(age),
     .groups = "drop"
   )
 
 ggplot(age_per_sport, aes(x = sport, y = media_idade_esporte, group = 1)) +
-  geom_line(color = "chocolate", size = 1) +
-  geom_point(color = "brown", size = 2) +
+  geom_line(color = "lightgreen", linewidth = 1) +
+  geom_point(color = "darkgreen", size = 2) +
   labs(
     title = "Média de Idade por Esporte",
     x = "Esporte",
@@ -467,9 +468,22 @@ ggplot(age_per_sport, aes(x = sport, y = media_idade_esporte, group = 1)) +
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
+ggplot(age_per_sport, aes(x = sport, y = minimo_idade_esporte, group = 1)) +
+  geom_line(color = "lightgreen", linewidth = 1) +
+  geom_point(color = "darkgreen", size = 2) +
+  labs(
+    title = "Mínimo de Idade por Esporte",
+    x = "Esporte",
+    y = "Média de Idade"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
 # Boxplot "Distribuição da Idade por Esporte"
 ggplot(bio_event_games_f, aes(x = sport, y = age)) +
-  geom_boxplot(fill = "hotpink", color = "magenta") +
+  geom_boxplot(fill = "lightgreen", color = "darkgreen") +
   labs(
     title = "Distribuição da Idade por Esporte",
     x = "Espote",
@@ -479,6 +493,78 @@ ggplot(bio_event_games_f, aes(x = sport, y = age)) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
+
+# Top 15 Esportes com os Menores Mínimos de Idade Registradas
+top15_min_age_sports <- bio_event_games_f %>%
+  group_by(sport) %>%
+  summarise(
+    idade_minima = min(age, na.rm = TRUE),
+    media_idade = mean(age, na.rm = TRUE),
+    n = sum(!is.na(age)),
+    .groups = "drop"
+  ) %>%
+  arrange(idade_minima) %>%
+  slice_head(n = 15)
+print(top15_min_age_sports)
+
+ggplot(top15_min_age_sports, aes(x = reorder(sport, idade_minima), y = idade_minima)) +
+  geom_col(fill = "lightgreen") +
+  geom_text(aes(label = idade_minima), vjust = -0.5, size = 3) +
+  labs(
+    title = "Top 15 Esportes com Menores Idades Mínimas",
+    x = "Esporte",
+    y = "Idade Mínima"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Top 15 Esportes com Maior Quantidade de Menores de Idade - Acumulada 
+top15_sports_minors <- bio_event_games_f %>%
+  filter(age < 18) %>%
+  group_by(sport) %>%
+  summarise(
+    qtd_menores = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(qtd_menores)) %>%
+  slice_head(n = 15)
+print(top15_sports_minors)
+
+ggplot(top15_sports_minors, aes(x = reorder(sport, qtd_menores), y = qtd_menores)) +
+  geom_col(fill = "lightgreen") +
+  geom_text(aes(label = qtd_menores), hjust = -0.1, size = 3) +
+  labs(
+    title = "Top 15 Esportes com Maior Quantidade de Menores de Idade",
+    x = "Esporte",
+    y = "Quantidade de Menores"
+  ) +
+  coord_flip() +  
+  theme_minimal()
+
+# Top 15 Esportes com Menor Quantidade de Menores de Idade - Acumulada 
+top15_sports_minors_lowest <- bio_event_games_f %>%
+  filter(age < 18) %>%
+  group_by(sport) %>%
+  summarise(
+    qtd_menores = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(qtd_menores) %>%  # ordem crescente
+  slice_head(n = 15)
+
+print(top15_sports_minors_lowest)
+
+ggplot(top15_sports_minors_lowest, aes(x = reorder(sport, qtd_menores), y = qtd_menores)) +
+  geom_col(fill = "lightgreen") +
+  geom_text(aes(label = qtd_menores), hjust = -0.1, size = 3) +
+  labs(
+    title = "Top 15 Esportes com Menor Quantidade de Menores de Idade",
+    x = "Esporte",
+    y = "Quantidade de Menores"
+  ) +
+  coord_flip() +
+  theme_minimal()
+
 
 # Média, mínimo e máximo de idade por sexo 
 bio_event_games_f %>%
@@ -506,22 +592,25 @@ age_per_sex <- bio_event_games_f %>%
     .groups = "drop"
   )
 
-ggplot(age_per_sex, aes(x = sex, y = media_idade_sexo, group = 1)) +
-  geom_col(fill = "blue") +
+ggplot(age_per_sex, aes(x = sex, y = media_idade_sexo, fill = sex)) +
+  geom_col() +
+  scale_fill_manual(values = c("Female" = "pink", "Male" = "lightblue")) +
   labs(
     title = "Média de Idade por Sexo",
     x = "Sexo",
     y = "Média de Idade"
   ) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # tirar essa barra NA
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 
 # Boxplot "Distribuição da Idade por Sexo"
-ggplot(bio_event_games_f, aes(x = sex, y = age)) +
-  geom_boxplot(fill = "steelblue", color = "lightblue") +
+ggplot(bio_event_games_f, aes(x = sex, y = age, fill = sex)) +
+  geom_boxplot(color = "black") +
+  scale_fill_manual(values = c("Female" = "pink", "Male" = "lightblue")) +
   labs(
     title = "Distribuição da Idade por Sexo",
-    x = "Sex",
+    x = "Sexo",
     y = "Idade"
   ) +
   theme_minimal() +
@@ -529,14 +618,69 @@ ggplot(bio_event_games_f, aes(x = sex, y = age)) +
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
+# Quantidade de Menores de Idade por Sexo e Edição Olímpica
+minors_per_edition_sex <- bio_event_games_f %>%
+  filter(age < 18) %>%  
+  mutate(
+    edition_type = str_extract(edition.y, "Summer|Winter")  
+  ) %>%
+  filter(!is.na(edition_type)) %>%  
+  group_by(year, sex, edition_type) %>%
+  summarise(qtd_menores = n(), .groups = "drop")
 
-# Número de menores por Olimpíada
+# Cria vetor de todos os anos presentes no dataset original
+all_years <- sort(unique(bio_event_games_f$year))
+
+# Ajusta o data frame para year ser fator com todos os anos como níveis
+minors_per_edition_sex <- minors_per_edition_sex %>%
+  mutate(year = factor(year, levels = all_years))
+
+
+ggplot(minors_per_edition_sex, aes(x = year, y = qtd_menores, fill = sex)) +
+  geom_col(position = position_dodge(width = 0.8)) +  
+  scale_fill_manual(values = c("Female" = "pink", "Male" = "lightblue")) +
+  labs(
+    title = "Quantidade de Menores de Idade por Sexo e Edição Olímpica",
+    x = "Ano",
+    y = "Quantidade de Menores",
+    fill = "Sexo"
+  ) +
+  facet_wrap(~edition_type, scales = "free_x") + 
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top"
+  )
+
+
+# Número total de menores por Olimpíada
 minors_per_edition <- bio_event_games_f %>%
+  filter(age < 18) %>%
+  group_by(edition.y) %>%
+  summarise(qtd_menores = n(), .groups = "drop") %>%
+  mutate(year = as.numeric(str_extract(edition.y, "\\d{4}"))) %>%
+  arrange(year) %>%
+  mutate(edition_factor = factor(edition.y, levels = unique(edition.y))) # cria fator na ordem do ano
+
+ggplot(minors_per_edition, aes(x = edition_factor, y = qtd_menores)) +
+  geom_col(fill = "lightgreen") +
+  labs(
+    title = "Quantidade Total de Menores de Idade por Olimpíada",
+    x = "Edição (Ano)",
+    y = "Quantidade de Menores"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+# Número total de menores por Olimpíada (ordem decrescente)
+minors_per_edition_dec <- bio_event_games_f %>%
   filter(age < 18) %>%
   group_by(edition.y) %>%
   summarise(qtd_menores = n()) %>%
   arrange(desc(qtd_menores))  
-print(minors_per_edition) 
+print(minors_per_edition_dec) 
 
 # edition.y              qtd_menores
 # <chr>                        <int>
@@ -550,6 +694,18 @@ print(minors_per_edition)
 # 8 2000 Summer Olympics         688
 # 9 1980 Summer Olympics         675
 #10 2004 Summer Olympics         591
+
+ggplot(minors_per_edition_dec, aes(x = reorder(edition.y, qtd_menores), y = qtd_menores)) +
+  geom_col(fill = "lightgreen") +
+  coord_flip() + 
+  labs(
+    title = "Quantidade de Menores de Idade por Edição Olímpica",
+    x = "Edição",
+    y = "Quantidade de Menores"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 
 
 # Proporção de menores por Olimpíada em ordem decrescente
@@ -578,60 +734,86 @@ print(minors_per_edition_proportion)
 
 minors_per_edition_proportion <- minors_per_edition_proportion %>%
   mutate(year = as.numeric(str_extract(edition.y, "\\d{4}")))
-library(scales)
-# Gráfico apenas com as edições de verão
+
+
 minors_per_edition_proportion %>%
   filter(str_detect(edition.y, "Summer")) %>%
   ggplot(aes(x = year, y = proporcao_menores)) +
-  geom_col(fill = "steelblue") +
+  geom_col(fill = "pink") +
   labs(
-    title = "Proporção de menores de idade por edição olímpica de verão",
+    title = "Proporção de Menores de Idade por Edição de Verão",
     x = "Ano",
     y = "Proporção de menores"
   ) +
-  scale_x_continuous(breaks = unique(minors_per_edition_proportion$year)) + 
+  scale_x_continuous(breaks = seq(min(age_per_edition_mean$year), max(age_per_edition_mean$year), by = 4)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  scale_y_continuous(labels = percent_format(accuracy = 1)) # revisar!!!! 
+  scale_y_continuous(labels = percent_format(accuracy = 1)) 
 
-# Número de menores por País
-minors_per_country <- bio_event_games_f %>%
-  filter(!is.na(age), age < 18) %>%
-  group_by(country_noc) %>%
-  summarise(qtd_menores = n()) %>%
-  arrange(desc(qtd_menores))  
-print(minors_per_country) 
-
-# A tibble: 25 × 2
-#   country_noc qtd_menores
-#   <chr>             <int>
-# 1 USA                2087
-# 2 CAN                1199
-# 3 FRG                1039
-# 4 KOR                1033
-# 5 ESP                 887
-# 6 AUS                 858
-# 7 MEX                 853
-# 8 JPN                 834
-# 9 URS                 675
-#10 CHN                 615
-
-# Número de menores por País - Gráfico
-minors_per_country <- bio_event_games_f %>%
-  group_by(country_noc) %>%
-  summarise(
-    menores_idade_pais = sum(age, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-ggplot(minors_per_country, aes(x = country_noc, y = menores_idade_pais, group = 1)) +
-  geom_col(fill = "blue") +
+minors_per_edition_proportion %>%
+  filter(str_detect(edition.y, "Winter")) %>%
+  ggplot(aes(x = year, y = proporcao_menores)) +
+  geom_col(fill = "pink") +
   labs(
-    title = "Número de Menores de Idade por País",
-    x = "País (Sigla)",
-    y = "Quantidade"
+    title = "Proporção de Menores de Idade por Edição de Inverno",
+    x = "Ano",
+    y = "Proporção de menores"
   ) +
+  scale_x_continuous(breaks = seq(min(age_per_edition_mean$year), max(age_per_edition_mean$year), by = 4)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) 
+
+# Número de menores por País e Edição de Verão
+minors_by_country_year_s <- bio_event_games_f %>%
+  filter(!is.na(age), age < 18, str_detect(edition.y, "Summer")) %>%
+  group_by(year, country_noc) %>%
+  summarise(qtd_menores = n(), .groups = "drop")
+print(minors_by_country_year_s)
+
+# Média de menores por Edição de Verão
+mean_minors_per_sedition <- minors_by_country_year_s %>%
+  group_by(year) %>%
+  summarise(media_menores = mean(qtd_menores), .groups = "drop")
+print(mean_minors_per_sedition)
+
+mean_minors_per_sedition %>% filter(year == 1972) #1039 menores no verão de 1972
+
+ggplot(mean_minors_per_sedition, aes(x = year, y = media_menores)) +
+  geom_line(color = "pink", linewidth = 1) +
+  geom_point(color = "darkred", size = 2) +
+  labs(
+    title = "Média de Atletas Menores de Idade por Edição de Verão",
+    x = "Ano",
+    y = "Média de menores"
+  ) +
+  scale_x_continuous(breaks = unique(mean_minors_per_sedition$year)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+
+# Número de menores por País e Edição de Inverno
+minors_by_country_year_w <- bio_event_games_f %>%
+  filter(!is.na(age), age < 18, str_detect(edition.y, "Winter")) %>%
+  group_by(year, country_noc) %>%
+  summarise(qtd_menores = n(), .groups = "drop")
+print(minors_by_country_year_w)
+
+# Média de menores por Edição de Inverno
+mean_minors_per_wedition <- minors_by_country_year_w %>%
+  group_by(year) %>%
+  summarise(media_menores = mean(qtd_menores), .groups = "drop")
+print(mean_minors_per_wedition)
+
+ggplot(mean_minors_per_wedition, aes(x = year, y = media_menores)) +
+  geom_line(color = "lightblue", linewidth = 1) +
+  geom_point(color = "darkblue", size = 2) +
+  labs(
+    title = "Média de Atletas Menores de Idade por Edição de Inverno",
+    x = "Ano",
+    y = "Média de menores"
+  ) +
+  scale_x_continuous(breaks = unique(mean_minors_per_wedition$year)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
 # Menores de idade e medalhas/classificações
-# esportes com os menores minimos de idade
+# Esportes com os menores minimos de idade
